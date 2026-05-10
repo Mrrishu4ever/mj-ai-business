@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  name           String?
+  password      String?
+  image          String?
+  role           String       @default("USER")
+  provider       String       @default("EMAIL")
+  isActive       Boolean      @default(true)
+  subscriptionId String?
+  subscription  Subscription? @relation(fields: [subscriptionId], references: [id])
+  business      Business?
+  leads         Lead[]
+  messages      Message[]
+  createdAt     DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Business {
+  id              String        @id @default(cuid())
+  name            String
+  description    String?
+  phone           String?
+  address        String?
+  logo            String?
+  whatsappNumber String?
+  whatsappToken  String?
+  isConnected     Boolean      @default(false)
+  userId          String       @unique
+  user            User         @relation(fields: [userId], references: [id])
+  settings       AISettings?
+  createdAt      DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model AISettings {
+  id                  String   @id @default(cuid())
+  businessId          String   @unique
+  business            Business @relation(fields: [businessId], references: [id])
+  isEnabled           Boolean  @default(true)
+  tone                String   @default("professional")
+  greetingMessage    String?
+  customInstructions String?
+  autoReplyDelay     Int       @default(0)
+  businessName      String?
+  pricing           String?
+  services         String?
+  faqs             String?
+  openingHours     String?
+  language        String   @default("en")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Lead {
+  id           String    @id @default(cuid())
+  name         String?
+  phone        String    @unique
+  email        String?
+  lastMessage String?
+  tags        String?
+  status      String    @default("NEW")
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  messages    Message[]
+  appointments Appointment[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  content   String
+  direction String
+  status    String   @default("DELIVERED")
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id                 String    @id @default(cuid())
+  plan               String    @default("FREE")       // FREE, PRO, ENTERPRISE
+  status             String    @default("ACTIVE")    // ACTIVE, CANCELLED, PAST_DUE
+  messageCount       Int       @default(0)          // Messages used this month
+  messageLimit      Int       @default(100)         // Monthly message limit
+  aiEnabled        Boolean   @default(false)        // Advanced AI features
+  maxLeads         Int       @default(10)         // Max leads
+  maxSeats         Int       @default(1)          // User seats
+  razorpaySubId     String?
+  stripeSubId      String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  users           User[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Analytics {
+  id             String   @id @default(cuid())
+  userId         String
+  date          DateTime
+  totalMessages Int     @default(0)
+  aiReplies     Int     @default(0)
+  leadsGenerated Int    @default(0)
+  conversations Int    @default(0)
+  createdAt     DateTime @default(now())
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  title       String
+  date        DateTime
+  duration   Int      @default(30)
+  status      String   @default("PENDING")
+  notes       String?
+  leadId     String
+  lead       Lead    @relation(fields: [leadId], references: [id])
+  businessId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
