@@ -26,19 +26,40 @@ const navItems = [
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const { sidebarOpen, setSidebarOpen, theme, toggleTheme } = useUIStore();
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Check auth on mount
   useEffect(() => {
     setMounted(true);
     const token = localStorage.getItem('token');
+
     if (!token) {
       router.push('/login');
+      return;
     }
-  }, [router]);
+
+    // Try to fetch user data
+    const init = async () => {
+      try {
+        const { data } = await authApi.me();
+        useAuthStore.getState().setAuth(data, token);
+      } catch {
+        // Token invalid - clear and redirect
+        logout();
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
+  }, [router, logout]);
 
   // Show loading while checking
-  if (!mounted) {
+  if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -46,141 +67,102 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  const { user, logout } = useAuthStore();
-  const { sidebarOpen, setSidebarOpen, theme, toggleTheme } = useUIStore();
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const init = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-      try {
-        const { data } = await authApi.me();
-        useAuthStore.getState().setAuth(data, token);
-      } catch {
-        logout();
-        router.push('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-    init();
-  }, [router, logout]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
-      </div>
-    );
-  }
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background">
       {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{ width: sidebarOpen ? 240 : 80 }}
-        className="fixed left-0 top-0 bottom-0 z-40 glass-dark border-r border-border"
+      <aside
+        className={cn(
+          'fixed left-0 top-0 z-40 h-screen w-64 bg-card border-r transform transition-transform duration-200 lg:translate-x-0',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className="p-6 border-b">
             <Link href="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
                 <Bot className="w-5 h-5 text-white" />
               </div>
-              {sidebarOpen && <span className="text-lg font-bold">MJ AI</span>}
+              <span className="text-xl font-bold">MJ AI</span>
             </Link>
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden">
-              <X className="w-5 h-5" />
-            </button>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-2 space-y-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                  )}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {sidebarOpen && <span>{item.name}</span>}
-                </Link>
-              );
-            })}
+          {/* Nav */}
+          <nav className="flex-1 p-4 space-y-1">
+            {navItems.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                  pathname === item.href
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-secondary'
+                )}
+              >
+                <item.icon className="w-5 h-5" />
+                {item.name}
+                {pathname === item.href && (
+                  <ChevronRight className="w-4 h-4 ml-auto" />
+                )}
+              </Link>
+            ))}
           </nav>
 
           {/* User */}
-          <div className="p-4 border-t border-border">
-            <div className="flex items-center space-x-3">
+          <div className="p-4 border-t">
+            <div className="flex items-center gap-3 mb-4">
               <Avatar>
-                <AvatarImage src={user?.image || ''} />
+                <AvatarImage src={user?.image} />
                 <AvatarFallback>{user?.name?.[0] || 'U'}</AvatarFallback>
               </Avatar>
-              {sidebarOpen && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                </div>
-              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{user?.name || 'User'}</p>
+                <p className="text-sm text-muted-foreground truncate">{user?.email || 'user@example.com'}</p>
+              </div>
             </div>
+            <Button variant="outline" className="w-full" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
           </div>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Main */}
-      <div
-        className="flex-1 transition-all"
-        style={{ marginLeft: sidebarOpen ? 240 : 80 }}
-      >
+      <div className="lg:pl-64">
         {/* Header */}
-        <header className="sticky top-0 z-30 glass-dark border-b border-border">
-          <div className="flex items-center justify-between h-16 px-4">
-            <button
+        <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur border-b">
+          <div className="flex items-center justify-between h-full px-4 lg:px-8">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="hidden md:flex items-center"
             >
-              <Menu className="w-5 h-5" />
-            </button>
+              {sidebarOpen ? <X /> : <Menu />}
+            </Button>
 
             <div className="flex-1" />
 
-            <div className="flex items-center space-x-2">
-              <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-secondary">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={toggleTheme}>
                 {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-              <button className="p-2 rounded-lg hover:bg-secondary relative">
+              </Button>
+              <Button variant="ghost" size="icon">
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />
-              </button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  logout();
-                  router.push('/login');
-                }}
-              >
-                <LogOut className="w-4 h-4" />
               </Button>
             </div>
           </div>
         </header>
 
         {/* Content */}
-        <main className="p-6">{children}</main>
+        <main className="p-4 lg:p-8">{children}</main>
       </div>
     </div>
   );
