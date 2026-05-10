@@ -118,7 +118,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="p-4 border-t">
             <div className="flex items-center gap-3 mb-4">
               <Avatar>
-                <AvatarImage src={user?.image} />
+                <AvatarImage src={user?.image || undefined} />
                 <AvatarFallback>{user?.name?.[0] || 'U'}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
