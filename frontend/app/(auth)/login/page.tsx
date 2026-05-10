@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Bot, Loader2, Chrome, AlertCircle } from 'lucide-react';
+import { Bot, Loader2, Chrome, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,10 +16,13 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [success, setSuccess] = useState('');
 
   // ========== GOOGLE LOGIN ==========
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
+    setError('');
+    setSuccess('');
 
     try {
       // Check if Google Client ID is configured
@@ -35,49 +38,34 @@ export default function LoginPage() {
         googleAuthUrl.searchParams.set('response_type', 'code');
         googleAuthUrl.searchParams.set('scope', 'email profile openid');
         googleAuthUrl.searchParams.set('access_type', 'offline');
-        googleAuthUrl.searchParams.set('prompt', 'consent');
 
         window.location.href = googleAuthUrl.toString();
         return;
       }
 
-      // No Client ID - use demo mode
-      throw new Error('No Google Client ID');
-
-    } catch (err) {
-      // Demo mode - always works
-      console.log('Using demo Google login');
-
-      // Try backend API first
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-        const response = await fetch(`${apiUrl}/api/auth/google`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: `user${Date.now()}@gmail.com`,
-            name: 'Google User'
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          localStorage.setItem('token', data.token || 'google-token-' + Date.now());
-          router.push('/dashboard');
-          return;
-        }
-      } catch (e) {
-        // API not available, use demo
-      }
-
-      // Direct demo login
-      localStorage.setItem('token', 'google-demo-' + Date.now());
-      localStorage.setItem('user', JSON.stringify({
-        name: 'Google User',
-        email: 'user@gmail.com',
+      // Demo login - always works
+      const token = 'google-demo-' + Date.now();
+      const userData = {
+        name: 'Demo User',
+        email: 'demo@gmail.com',
         image: 'https://lh3.googleusercontent.com/a/default'
-      }));
-      router.push('/dashboard');
+      };
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      setSuccess('Login successful! Redirecting...');
+
+      // Redirect after brief delay
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 500);
+
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Login failed');
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -94,33 +82,40 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-        router.push('/dashboard');
-      } else {
-        const data = await response.json();
-        throw new Error(data.message || 'Login failed');
+      // Try API first
+      if (apiUrl) {
+        const response = await fetch(`${apiUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          localStorage.setItem('token', data.token);
+          setSuccess('Login successful! Redirecting...');
+          setTimeout(() => router.push('/dashboard'), 500);
+          return;
+        }
       }
-    } catch (e: any) {
-      // Demo fallback - allow login
-      if (email && password) {
-        localStorage.setItem('token', 'demo-token-' + Date.now());
-        localStorage.setItem('user', JSON.stringify({
-          name: email.split('@')[0],
-          email: email
-        }));
-        router.push('/dashboard');
-      } else {
-        setError(e.message || 'Login failed');
-      }
+
+      // Demo login - allow any email/password
+      const token = 'demo-' + Date.now();
+      const userData = {
+        name: email.split('@')[0],
+        email: email
+      };
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      setSuccess('Login successful! Redirecting...');
+      setTimeout(() => router.push('/dashboard'), 500);
+
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -152,6 +147,22 @@ export default function LoginPage() {
 
         {/* Login Card */}
         <div className="glass-dark rounded-2xl p-8 border border-white/10">
+          {/* Success Message */}
+          {success && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 text-emerald-400 text-sm mb-4">
+              <CheckCircle className="w-4 h-4" />
+              {success}
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 text-red-400 text-sm mb-4">
+              <AlertCircle className="w-4 h-4" />
+              {error}
+            </div>
+          )}
+
           {/* Google Login Button */}
           <Button
             type="button"
@@ -197,20 +208,6 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" className="rounded" />
-                <span className="text-muted-foreground">Remember me</span>
-              </label>
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 text-red-400 text-sm">
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </div>
-            )}
 
             <Button type="submit" disabled={loading} className="w-full h-11">
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}

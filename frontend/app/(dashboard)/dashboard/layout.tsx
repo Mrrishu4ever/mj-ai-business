@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Bot, MessageSquare, Users, Settings, Calendar, CreditCard,
-  BarChart3, LogOut, Menu, X, Sun, Moon, Bell, ChevronRight
+  BarChart3, LogOut, Menu, X, Sun, Moon, Bell, ChevronRight, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore, useUIStore } from '@/store';
@@ -26,6 +26,26 @@ const navItems = [
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  // Check auth on mount
+  useEffect(() => {
+    setMounted(true);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+    }
+  }, [router]);
+
+  // Show loading while checking
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   const { user, logout } = useAuthStore();
   const { sidebarOpen, setSidebarOpen, theme, toggleTheme } = useUIStore();
   const [loading, setLoading] = useState(true);
