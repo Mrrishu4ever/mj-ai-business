@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "backend/whatsapp-manager.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "backend/whatsapp-manager.js" }
+  ]
+}
